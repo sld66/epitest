@@ -1,0 +1,7 @@
+{
+  "name": "Suivi EPI Pro",
+  "description": "Une application professionnelle de suivi de distribution d'Équipements de Protection Individuelle (EPI) avec scanner QR code intégré et analyse intelligente.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
