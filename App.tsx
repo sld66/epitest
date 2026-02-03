@@ -32,6 +32,13 @@ const App: React.FC = () => {
     localStorage.setItem(STORAGE_KEY_AGENTS, JSON.stringify(updatedAgents));
   };
 
+  const handleImportData = (newAgents: User[], newItems: ScannedItem[]) => {
+    setAgents(newAgents);
+    setScannedItems(newItems);
+    localStorage.setItem(STORAGE_KEY_AGENTS, JSON.stringify(newAgents));
+    if (currentView !== View.SCAN) setCurrentView(View.SCAN);
+  };
+
   const handleLogout = () => {
     if (window.confirm("Finir la mission ? Les données de scan seront réinitialisées.")) {
       setAgents([]);
@@ -76,6 +83,7 @@ const App: React.FC = () => {
             onRemove={removeScannedItem}
             onReset={() => setScannedItems([])}
             onAddAgent={handleAddAgentInline}
+            onImportData={handleImportData}
           />
         )}
       </main>
