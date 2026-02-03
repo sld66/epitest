@@ -20,7 +20,7 @@ const ScannerView: React.FC<ScannerViewProps> = ({ agents, items, onScan, onRemo
   const [isScanning, setIsScanning] = useState(true);
   const [scannerReady, setScannerReady] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
-  const [justScanned, setJustScanned] = useState(false);
+  const [lastAction, setLastAction] = useState<{ type: 'agent' | 'item', name?: string, code?: string } | null>(null);
   
   // Selection of beneficiary agent
   const [selectedAgentMatricule, setSelectedAgentMatricule] = useState<string>(agents[0]?.matricule || '');
@@ -78,13 +78,29 @@ const ScannerView: React.FC<ScannerViewProps> = ({ agents, items, onScan, onRemo
   }, []);
 
   const handleSuccessfulScan = (code: string) => {
-    if (isLockedRef.current || !selectedAgentMatricule) return;
-    
+    if (isLockedRef.current) return;
     isLockedRef.current = true;
-    onScan(code, selectedAgentMatricule);
-    
-    setJustScanned(true);
-    if (navigator.vibrate) navigator.vibrate(150);
+
+    // Check if the scanned code is an agent's matricule
+    const foundAgent = agents.find(a => a.matricule === code || a.matricule.toUpperCase() === code.toUpperCase());
+
+    if (foundAgent) {
+      // It's an agent! Switch focus
+      setSelectedAgentMatricule(foundAgent.matricule);
+      setLastAction({ type: 'agent', name: `${foundAgent.prenom} ${foundAgent.nom}` });
+      if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+    } else {
+      // It's an item! Assign to selected agent if possible
+      if (!selectedAgentMatricule) {
+        alert("Veuillez d'abord sélectionner un agent ou scanner un badge agent.");
+        isLockedRef.current = false;
+        return;
+      }
+      onScan(code, selectedAgentMatricule);
+      const agent = agents.find(a => a.matricule === selectedAgentMatricule);
+      setLastAction({ type: 'item', code, name: agent?.nom });
+      if (navigator.vibrate) navigator.vibrate(150);
+    }
 
     if (scannerRef.current) {
       scannerRef.current.pause();
@@ -92,7 +108,7 @@ const ScannerView: React.FC<ScannerViewProps> = ({ agents, items, onScan, onRemo
     }
 
     setTimeout(() => {
-      setJustScanned(false);
+      setLastAction(null);
       isLockedRef.current = false;
       if (scannerRef.current) {
         scannerRef.current.resume();
@@ -206,8 +222,8 @@ const ScannerView: React.FC<ScannerViewProps> = ({ agents, items, onScan, onRemo
       </div>
 
       {/* Current Selection Info */}
-      <div className="bg-blue-50 px-4 py-2 flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-blue-500">
-        <span>Bénéficiaire : {selectedAgent ? `${selectedAgent.prenom} ${selectedAgent.nom} (CIS ${selectedAgent.centre})` : 'Sélectionnez un agent'}</span>
+      <div className={`px-4 py-2 flex justify-between items-center text-[10px] font-black uppercase tracking-widest transition-colors ${selectedAgent ? 'bg-blue-50 text-blue-500' : 'bg-red-50 text-red-500'}`}>
+        <span>Bénéficiaire : {selectedAgent ? `${selectedAgent.prenom} ${selectedAgent.nom} (CIS ${selectedAgent.centre})` : '⚠️ SCANNEZ UN BADGE AGENT'}</span>
         <span>{items.filter(i => i.agentMatricule === selectedAgentMatricule).length} scan(s)</span>
       </div>
 
@@ -223,15 +239,26 @@ const ScannerView: React.FC<ScannerViewProps> = ({ agents, items, onScan, onRemo
             </div>
           )}
 
-          {justScanned && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center text-white bg-green-600/85 animate-in fade-in zoom-in duration-200 z-20 text-center px-4">
-              <div className="bg-white text-green-600 rounded-full p-4 mb-2 shadow-2xl mx-auto">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 13l4 4L19 7" />
-                </svg>
+          {lastAction && (
+            <div className={`absolute inset-0 flex flex-col items-center justify-center text-white animate-in fade-in zoom-in duration-200 z-20 text-center px-4 ${lastAction.type === 'agent' ? 'bg-blue-600/90' : 'bg-green-600/90'}`}>
+              <div className="bg-white text-inherit rounded-full p-4 mb-2 shadow-2xl mx-auto" style={{ color: lastAction.type === 'agent' ? '#2563eb' : '#16a34a' }}>
+                {lastAction.type === 'agent' ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
               </div>
-              <p className="text-xl font-black tracking-widest uppercase">ENREGISTRÉ</p>
-              <p className="text-xs font-bold opacity-90 mt-1">Affecté à {selectedAgent?.nom}</p>
+              <p className="text-xl font-black tracking-widest uppercase">
+                {lastAction.type === 'agent' ? 'AGENT SÉLECTIONNÉ' : 'EPI ENREGISTRÉ'}
+              </p>
+              <p className="text-xs font-bold opacity-90 mt-1">
+                {lastAction.type === 'agent' ? lastAction.name : `Affecté à ${lastAction.name}`}
+              </p>
+              {lastAction.code && <p className="mt-2 text-[10px] font-mono bg-black/20 px-2 py-0.5 rounded">{lastAction.code}</p>}
             </div>
           )}
           
@@ -271,8 +298,8 @@ const ScannerView: React.FC<ScannerViewProps> = ({ agents, items, onScan, onRemo
             const agentItems = items.filter(i => i.agentMatricule === agent.matricule);
             if (agentItems.length === 0) return null;
             return (
-              <div key={agent.matricule} className="animate-in slide-in-from-bottom duration-300">
-                <div className="flex justify-between items-center mb-1 bg-blue-50/50 px-2 py-1.5 rounded-lg border border-blue-100/50">
+              <div key={agent.matricule} className={`animate-in slide-in-from-bottom duration-300 ${selectedAgentMatricule === agent.matricule ? 'ring-2 ring-blue-400 ring-offset-2 rounded-2xl p-1' : ''}`}>
+                <div className={`flex justify-between items-center mb-1 px-2 py-1.5 rounded-lg border ${selectedAgentMatricule === agent.matricule ? 'bg-blue-100 border-blue-200' : 'bg-blue-50/50 border-blue-100/50'}`}>
                    <span className="text-[10px] font-bold text-blue-900">{agent.prenom} {agent.nom} (CIS {agent.centre})</span>
                    <span className="text-[10px] font-mono text-blue-400">{agent.matricule}</span>
                 </div>
@@ -299,7 +326,7 @@ const ScannerView: React.FC<ScannerViewProps> = ({ agents, items, onScan, onRemo
               <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
-              <p className="text-[10px] font-bold uppercase tracking-widest">Aucun équipement scanné</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-center px-6">Scanner un badge agent ou un équipement</p>
             </div>
           )}
         </div>
