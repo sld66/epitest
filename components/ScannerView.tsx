@@ -22,6 +22,10 @@ const ScannerView: React.FC<ScannerViewProps> = ({ agents, items, onScan, onRemo
   const [analyzing, setAnalyzing] = useState(false);
   const [lastAction, setLastAction] = useState<{ type: 'agent' | 'item', name?: string, code?: string } | null>(null);
   
+  // Manual input state
+  const [showManualInput, setShowManualInput] = useState(false);
+  const [manualInputCode, setManualInputCode] = useState('');
+
   // Selection of beneficiary agent
   const [selectedAgentMatricule, setSelectedAgentMatricule] = useState<string>(agents[0]?.matricule || '');
   
@@ -115,6 +119,13 @@ const ScannerView: React.FC<ScannerViewProps> = ({ agents, items, onScan, onRemo
         setIsScanning(true);
       }
     }, 1500);
+  };
+
+  const submitManualInput = () => {
+    if (!manualInputCode.trim()) return;
+    handleSuccessfulScan(manualInputCode.trim());
+    setManualInputCode('');
+    setShowManualInput(false);
   };
 
   const handleAddAgent = () => {
@@ -272,21 +283,49 @@ const ScannerView: React.FC<ScannerViewProps> = ({ agents, items, onScan, onRemo
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 mt-4">
-          <button 
-            onClick={() => setIsScanning(!isScanning)}
-            className={`py-3 rounded-2xl font-bold transition-all shadow-lg active:scale-95 ${
-              isScanning ? 'bg-orange-500 text-white shadow-orange-100' : 'bg-green-600 text-white shadow-green-100'
-            }`}
-          >
-            {isScanning ? '⏸ Pause' : '▶ Reprendre'}
-          </button>
-          <button 
-            onClick={() => handleSuccessfulScan(`EPI-${Math.floor(Math.random() * 90000) + 10000}`)}
-            className="bg-white text-gray-700 py-3 rounded-2xl font-bold border border-gray-200 active:scale-95 shadow-sm"
-          >
-            ⚡ Scan Manuel
-          </button>
+        <div className="mt-4 flex flex-col gap-3">
+          {showManualInput ? (
+            <div className="flex gap-2 animate-in slide-in-from-top duration-200">
+              <input 
+                autoFocus
+                type="text" 
+                placeholder="Entrez le code manuellement..." 
+                className="flex-grow bg-white border border-blue-200 px-4 py-3 rounded-2xl text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-none"
+                value={manualInputCode}
+                onChange={e => setManualInputCode(e.target.value)}
+                onKeyPress={e => e.key === 'Enter' && submitManualInput()}
+              />
+              <button 
+                onClick={submitManualInput}
+                className="bg-blue-600 text-white px-6 py-3 rounded-2xl font-bold shadow-lg"
+              >
+                Valider
+              </button>
+              <button 
+                onClick={() => { setShowManualInput(false); setManualInputCode(''); }}
+                className="bg-gray-100 text-gray-500 px-4 rounded-2xl font-bold"
+              >
+                ×
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <button 
+                onClick={() => setIsScanning(!isScanning)}
+                className={`py-3 rounded-2xl font-bold transition-all shadow-lg active:scale-95 ${
+                  isScanning ? 'bg-orange-500 text-white shadow-orange-100' : 'bg-green-600 text-white shadow-green-100'
+                }`}
+              >
+                {isScanning ? '⏸ Pause' : '▶ Reprendre'}
+              </button>
+              <button 
+                onClick={() => setShowManualInput(true)}
+                className="bg-white text-gray-700 py-3 rounded-2xl font-bold border border-gray-200 active:scale-95 shadow-sm flex items-center justify-center gap-2"
+              >
+                ⌨️ Saisie Manuelle
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
